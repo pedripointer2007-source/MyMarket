@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyMarket - Tu Tienda Online Profesional</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Iconos globales -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+ <body>
+
+    <!-- Contenedor para Notificaciones Toast (UI/UX) -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Navbar Estilo E-Commerce -->
+    <header class="navbar">
+        <div class="navbar-brand">MyMarket</div>
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Buscar productos por nombre...">
+            <button id="search-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </div>
+        <div class="navbar-actions">
+            <button class="login-btn" id="login-btn" aria-label="Iniciar sesión">
+                <i class="fa-solid fa-user"></i>
+                <span>Iniciar sesión</span>
+            </button>
+            <div class="user-profile" id="user-profile" aria-label="Perfil de usuario">
+                <div class="profile-avatar"><i class="fa-solid fa-user-check"></i></div>
+                <div class="profile-info">
+                    <span class="profile-name">Usuario</span>
+                    <small class="profile-status">Conectado</small>
+                </div>
+            </div>
+            <div class="cart-trigger" id="cart-btn" aria-label="Ver carrito">
+                <i class="fa-solid fa-cart-shopping"></i>
+                <span class="cart-badge" id="cart-count">0</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="action-buttons-bar">
+        <button class="action-btn action-buy" id="buy-btn">
+            <i class="fa-solid fa-cart-plus"></i>
+            Comprar ahora
+        </button>
+        <button class="action-btn action-sell" id="sell-btn">
+            <i class="fa-solid fa-tag"></i>
+            Vender producto
+        </button>
+    </div>
+
+    <!-- Cuerpo Principal -->
+    <main class="main-container">
+        <section class="catalog-section">
+            <h2 class="section-title">Productos Destacados</h2>
+            <!-- El contenedor se llenará con Skeletons o Productos por JS -->
+            <div class="products-grid" id="products-container"></div>
+        </section>
+    </main>
+
+    <!-- Sidebar del Carrito -->
+    <div class="cart-sidebar" id="cart-sidebar">
+        <div class="cart-sidebar-header">
+            <h3>Tu Carrito</h3>
+            <button class="close-sidebar-btn" id="close-cart" aria-label="Cerrar carrito">&times;</button>
+        </div>
+        <div class="cart-sidebar-body" id="cart-items-container">
+            <!-- Items dinámicos -->
+        </div>
+        <div class="cart-sidebar-footer">
+            <div class="summary-row">
+                <span>Total estimado:</span>
+                <span class="total-price">$<span id="cart-total-val">0.00</span></span>
+            </div>
+            <button class="checkout-btn" id="checkout-btn">Proceder al pago</button>
+        </div>
+    </div>
+
+    <!-- Modal de Proceso de Pago -->
+<div id="payment-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Finalizar Compra</h3>
+            <button id="close-payment" class="close-modal">&times;</button>
+        </div>
+        <form id="payment-form" class="payment-form">
+            <div class="form-group">
+                <label>Nombre en la tarjeta</label>
+                <input type="text" id="card-name" placeholder="JUAN PEREZ" required>
+            </div>
+            <div class="form-group">
+                <label>Número de tarjeta</label>
+                <div class="input-with-icon">
+                    <input type="text" id="card-number" placeholder="0000 0000 0000 0000" maxlength="19" required>
+                    <i class="fa-solid fa-credit-card"></i>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Expira (MM/AA)</label>
+                    <input type="text" id="card-expiry" placeholder="MM/AA" maxlength="5" required>
+                </div>
+                <div class="form-group">
+                    <label>CVV</label>
+                    <input type="password" id="card-cvv" placeholder="123" maxlength="3" required>
+                </div>
+            </div>
+            <div class="payment-summary">
+                <span>Total a pagar:</span>
+                <strong id="modal-total">$0.00</strong>
+            </div>
+            <button type="submit" id="pay-button" class="pay-btn pay-now-btn">
+                <span class="btn-text">Pagar Ahora</span>
+                <div class="spinner hidden" id="pay-spinner"></div>
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="login-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Iniciar sesión</h3>
+            <button id="close-login" class="close-modal">&times;</button>
+        </div>
+        <form id="login-form" class="payment-form">
+            <div class="form-group">
+                <label>Correo electrónico</label>
+                <input type="email" id="login-email" placeholder="usuario@correo.com" required>
+            </div>
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" id="login-password" placeholder="********" minlength="6" required>
+            </div>
+            <button type="submit" class="pay-btn login-submit-btn">
+                <span class="btn-text">Entrar</span>
+                <div class="spinner hidden"></div>
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="sell-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Vender producto</h3>
+            <button id="close-sell" class="close-modal">&times;</button>
+        </div>
+        <form id="sell-form" class="payment-form">
+            <div class="form-group">
+                <label>Nombre del producto</label>
+                <input type="text" id="sell-title" placeholder="Nombre del producto" required>
+            </div>
+            <div class="form-group">
+                <label>Categoría</label>
+                <select id="sell-category" required>
+                    <option value="">Selecciona una categoría</option>
+                    <option value="Electrónica">Electrónica</option>
+                    <option value="Moda">Moda</option>
+                    <option value="Hogar">Hogar</option>
+                    <option value="Deportes">Deportes</option>
+                    <option value="Juguetes">Juguetes</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Precio</label>
+                    <input type="number" id="sell-price" placeholder="0.00" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad</label>
+                    <input type="number" id="sell-quantity" placeholder="1" min="1" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Condición</label>
+                <select id="sell-condition" required>
+                    <option value="">Selecciona condición</option>
+                    <option value="Nuevo">Nuevo</option>
+                    <option value="Seminuevo">Seminuevo</option>
+                    <option value="Usado">Usado</option>
+                    <option value="Reacondicionado">Reacondicionado</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Descripción detallada</label>
+                <textarea id="sell-description" rows="5" placeholder="Describe tu producto con detalle" required></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Ciudad / Ubicación</label>
+                    <input type="text" id="sell-location" placeholder="Ciudad, barrio" required>
+                </div>
+                <div class="form-group">
+                    <label>Envío</label>
+                    <select id="sell-delivery" required>
+                        <option value="">Selecciona opción</option>
+                        <option value="Recogida local">Recogida local</option>
+                        <option value="Envío a domicilio">Envío a domicilio</option>
+                        <option value="Entrega personal">Entrega personal</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Fotos del producto</label>
+                <input type="file" id="sell-images" accept="image/*" multiple>
+            </div>
+            <button type="submit" class="pay-btn pay-now-btn">
+                <span class="btn-text">Publicar producto</span>
+                <div class="spinner hidden"></div>
+            </button>
+        </form>
+    </div>
+</div>
+
+<div id="profile-modal" class="modal">
+    <div class="modal-content profile-modal-content">
+        <div class="modal-header">
+            <h3>Mi perfil</h3>
+            <button id="close-profile" class="close-modal">&times;</button>
+        </div>
+        <div class="profile-details-card">
+            <div class="profile-card-top">
+                <div class="profile-avatar large"><i class="fa-solid fa-user-check"></i></div>
+                <div>
+                    <h4 id="profile-modal-name">Usuario</h4>
+                    <p id="profile-modal-email">Sin correo</p>
+                </div>
+            </div>
+            <div class="profile-stats-row">
+                <div>
+                    <span class="stat-label">Compras realizadas</span>
+                    <strong id="profile-purchases-count">0</strong>
+                </div>
+                <div>
+                    <span class="stat-label">Ventas publicadas</span>
+                    <strong id="profile-sales-count">0</strong>
+                </div>
+            </div>
+            <div class="profile-currency-panel">
+                <label for="profile-currency-select">Moneda</label>
+                <select id="profile-currency-select">
+                    <option value="NIO">Córdobas (NIO)</option>
+                    <option value="USD">Dólar (USD)</option>
+                </select>
+            </div>
+        </div>
+        <section class="history-section">
+            <h4>Historial de compras</h4>
+            <div id="purchase-history" class="history-list"></div>
+        </section>
+        <section class="history-section">
+            <h4>Historial de ventas</h4>
+            <div id="sales-history" class="history-list"></div>
+        </section>
+    </div>
+</div>
+
+    <script src="JS.js"></script>
+</body>
+</html>
