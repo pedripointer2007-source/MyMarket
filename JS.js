@@ -1,3 +1,9 @@
+// ==========================================
+// CONFIGURACIÓN BACKEND (INFINITYFREE)
+// ==========================================
+const API_URL = 'http://mymarket-api.gamer.gd/api.php';
+
+
 // 1. Estado Centralizado de la Aplicación
 const AppState = {
     products: [],
@@ -8,9 +14,11 @@ const AppState = {
     user: {
         name: '',
         email: '',
+        password: '',
         purchases: [],
         sales: []
     },
+    registeredUsers: JSON.parse(localStorage.getItem('mymarket_users')) || [],
     currency: 'NIO'
 };
 
@@ -28,28 +36,32 @@ const DOM = {
     checkoutBtn: document.getElementById('checkout-btn')
 };
 
-// 3. Simulación de Petición API con Control de Errores Explicito
+// 3. Petición API Real conectada a phpMyAdmin con Control de Errores
 async function loadCatalogData() {
     renderSkeletons();
     try {
-        // Simulamos latencia de red (1.2 segundos)
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        // Hacemos la petición real a tu archivo api.php en InfinityFree
+        const response = await fetch(`${API_URL}?action=get_products`);
+        
+        if (!response.ok) {
+            throw new Error(`Error en la red: ${response.status}`);
+        }
 
-        // Base de Datos Mock con Stock controlado
-        AppState.products = [
-            { id: 101, title: "Auriculares Inalámbricos Premium Pro Max", price: 129.99, stock: 4, img: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200", rating: 4.8, votes: 38 },
-            { id: 102, title: "Smartwatch Deportivo Waterproof GPS", price: 89.50, stock: 7, img: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200", rating: 4.4, votes: 24 },
-            { id: 103, title: "Teclado Mecánico RGB Switch Blue Latino", price: 64.00, stock: 2, img: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=200", rating: 4.7, votes: 17 },
-            { id: 104, title: "Cámara DSLR Semi-Profesional 24MP", price: 549.99, stock: 0, img: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=200", rating: 4.2, votes: 12 }
-        ];
+        // Convertimos la respuesta de la base de datos a JSON
+        const data = await response.json();
 
+        // Guardamos los productos reales de la base de datos en tu AppState
+        AppState.products = data;
         AppState.filteredProducts = [...AppState.products];
         AppState.loading = false;
+        
+        // Renderizamos tu catálogo original con los datos de internet
         renderCatalog();
 
     } catch (error) {
+        console.error("Error al conectar con la base de datos:", error);
         AppState.loading = false;
-        DOM.productsContainer.innerHTML = `<p class="error-msg">Ocurrió un error al cargar el catálogo. Por favor reintenta.</p>`;
+        DOM.productsContainer.innerHTML = `<p class="error-msg">Ocurrió un error al cargar el catálogo desde la base de datos. Por favor reintenta.</p>`;
         showNotification("Error de conexión con el servidor", "error");
     }
 }
@@ -91,9 +103,12 @@ function renderCatalog() {
                         ${renderRatingStars(product)}
                     </div>
                 </div>
-                <button class="btn-primary" ${isOut ? 'disabled' : ''} onclick="handleAddToCart(${product.id})">
-                    ${isOut ? 'Sin existencias' : 'Añadir al carrito'}
-                </button>
+                <div class="product-actions">
+                    <button class="btn-secondary" onclick="openProductDetails(${product.id})">Ver detalles</button>
+                    <button class="btn-primary" ${isOut ? 'disabled' : ''} onclick="handleAddToCart(${product.id})">
+                        ${isOut ? 'Sin existencias' : 'Añadir al carrito'}
+                    </button>
+                </div>
             </article>
         `;
     }).join('');
@@ -208,8 +223,36 @@ function renderRatingStars(product) {
 
 function syncAndSaveData() {
     localStorage.setItem('mymarket_cart', JSON.stringify(AppState.cart));
+    persistCurrentUserAccount();
     renderCart();
     renderCatalog(); // Se renderiza de nuevo para actualizar los textos de stock en vivo
+}
+
+function saveRegisteredUsers() {
+    localStorage.setItem('mymarket_users', JSON.stringify(AppState.registeredUsers));
+}
+
+function getRegisteredUser(email) {
+    return AppState.registeredUsers.find(user => user.email.toLowerCase() === email.toLowerCase());
+}
+
+function persistCurrentUserAccount() {
+    if (!AppState.user.email) return;
+    const existing = getRegisteredUser(AppState.user.email);
+    const userCopy = {
+        name: AppState.user.name,
+        email: AppState.user.email,
+        password: AppState.user.password,
+        purchases: AppState.user.purchases,
+        sales: AppState.user.sales
+    };
+    if (existing) {
+        const index = AppState.registeredUsers.findIndex(user => user.email.toLowerCase() === AppState.user.email.toLowerCase());
+        AppState.registeredUsers[index] = userCopy;
+    } else {
+        AppState.registeredUsers.push(userCopy);
+    }
+    saveRegisteredUsers();
 }
 
 function formatCurrency(amount) {
@@ -218,6 +261,15 @@ function formatCurrency(amount) {
         return `$${usdAmount.toFixed(2)} USD`;
     }
     return `C$${amount.toFixed(2)}`;
+}
+
+function readImageFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+        reader.readAsDataURL(file);
+    });
 }
 
 function renderUserProfile() {
@@ -254,6 +306,7 @@ function renderUserProfile() {
                 <h5>${item.title}</h5>
                 <p>Cantidad: ${item.quantity} · Precio: ${formatCurrency(item.price)}</p>
                 <p>${item.condition} · ${item.location}</p>
+                <p>Contacto: ${item.phone}</p>
                 <p>${item.delivery} · ${item.date}</p>
             </div>
         `).join('');
@@ -304,17 +357,40 @@ document.addEventListener('DOMContentLoaded', () => {
 // Nuevos elementos del DOM para el pago
 const paymentModal = document.getElementById('payment-modal');
 const paymentForm = document.getElementById('payment-form');
+const paymentError = document.getElementById('payment-error');
 const cardNumberInput = document.getElementById('card-number');
 const cardExpiryInput = document.getElementById('card-expiry');
 const closeBtnModal = document.getElementById('close-payment');
 const paySubmitBtn = document.getElementById('pay-button');
 
+const productDetailModal = document.getElementById('product-detail-modal');
+const closeProductDetailBtn = document.getElementById('close-product-detail');
+const detailProductImage = document.getElementById('detail-product-image');
+const detailProductTitle = document.getElementById('detail-product-title');
+const detailProductDescription = document.getElementById('detail-product-description');
+const detailProductPrice = document.getElementById('detail-product-price');
+const detailProductStock = document.getElementById('detail-product-stock');
+const detailProductCategory = document.getElementById('detail-product-category');
+const detailProductCondition = document.getElementById('detail-product-condition');
+const detailSellerContact = document.getElementById('detail-seller-contact');
+const detailContactWhatsapp = document.getElementById('detail-contact-whatsapp');
+const detailContactError = document.getElementById('detail-contact-error');
+let currentDetailProductId = null;
+
 const loginBtn = document.getElementById('login-btn');
 const loginModal = document.getElementById('login-modal');
 const loginForm = document.getElementById('login-form');
+const loginError = document.getElementById('login-error');
 const loginCloseBtn = document.getElementById('close-login');
 const loginEmail = document.getElementById('login-email');
 const loginPassword = document.getElementById('login-password');
+const showRegisterBtn = document.getElementById('show-register-btn');
+const registerForm = document.getElementById('register-form');
+const registerError = document.getElementById('register-error');
+const registerEmail = document.getElementById('register-email');
+const registerPassword = document.getElementById('register-password');
+const registerConfirmPassword = document.getElementById('register-confirm-password');
+const showLoginBtn = document.getElementById('show-login-btn');
 const buyBtn = document.getElementById('buy-btn');
 const sellBtn = document.getElementById('sell-btn');
 const userProfile = document.getElementById('user-profile');
@@ -331,12 +407,147 @@ const sellModal = document.getElementById('sell-modal');
 const sellForm = document.getElementById('sell-form');
 const sellCloseBtn = document.getElementById('close-sell');
 
-const openModal = (modal) => modal.classList.add('active');
+const openModal = (modal) => {
+    modal.classList.add('active');
+    if (modal === loginModal) {
+        clearLoginError();
+        clearRegisterError();
+        showLoginForm();
+    }
+    if (modal === paymentModal) clearPaymentError();
+};
 const closeModal = (modal) => modal.classList.remove('active');
+
+function showRegistrationForm() {
+    loginForm.classList.add('hidden');
+    registerForm.classList.remove('hidden');
+    clearLoginError();
+    clearRegisterError();
+}
+
+function showLoginForm() {
+    registerForm.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+    clearRegisterError();
+    clearLoginError();
+}
+
+function showRegisterError(message) {
+    registerError.textContent = message;
+    registerError.classList.remove('hidden');
+}
+
+function clearRegisterError() {
+    registerError.textContent = '';
+    registerError.classList.add('hidden');
+}
+
+function openProductDetails(productId) {
+    const product = AppState.products.find(p => p.id === productId);
+    if (!product) return;
+
+    detailProductImage.src = product.img;
+    detailProductImage.alt = product.title;
+    detailProductTitle.textContent = product.title;
+    detailProductDescription.textContent = product.description || 'Descripción no disponible.';
+    detailProductPrice.textContent = formatCurrency(product.price);
+    detailProductStock.textContent = product.stock > 0 ? product.stock : 'Agotado';
+    detailProductCategory.textContent = product.category || 'No especificado';
+    detailProductCondition.textContent = product.condition || 'No especificado';
+
+    const userHasPurchasedProduct = AppState.user.purchases.some(item => item.id === productId);
+    if (product.phone) {
+        const cleanPhone = product.phone.replace(/\D/g, '');
+        detailContactWhatsapp.dataset.phone = cleanPhone;
+        detailContactWhatsapp.dataset.active = userHasPurchasedProduct ? 'true' : 'false';
+        detailContactWhatsapp.classList.toggle('inactive', !userHasPurchasedProduct);
+        detailContactWhatsapp.setAttribute('aria-label', userHasPurchasedProduct ? 'Contactar por WhatsApp' : 'Contactar por WhatsApp (deshabilitado)');
+        detailSellerContact.classList.remove('hidden');
+    } else {
+        detailSellerContact.classList.add('hidden');
+    }
+    clearDetailContactError();
+    openModal(productDetailModal);
+}
+
+detailContactWhatsapp.addEventListener('click', () => {
+    const phone = detailContactWhatsapp.dataset.phone;
+    const isActive = detailContactWhatsapp.dataset.active === 'true';
+    if (!phone) return;
+    if (!isActive) {
+        showDetailContactError('Solo puedes contactar al vendedor si compras algunos de sus productos.');
+        return;
+    }
+    clearDetailContactError();
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent('Me gustaria mas informacion')}`, '_blank');
+});
+
+function showDetailContactError(message) {
+    detailContactError.textContent = message;
+    detailContactError.classList.remove('hidden');
+}
+
+function clearDetailContactError() {
+    detailContactError.textContent = '';
+    detailContactError.classList.add('hidden');
+}
 
 loginBtn.addEventListener('click', () => openModal(loginModal));
 loginCloseBtn.addEventListener('click', () => closeModal(loginModal));
 loginModal.addEventListener('click', (e) => { if (e.target === loginModal) closeModal(loginModal); });
+showRegisterBtn.addEventListener('click', showRegistrationForm);
+showLoginBtn.addEventListener('click', showLoginForm);
+
+registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearRegisterError();
+
+    const email = registerEmail.value.trim();
+    const password = registerPassword.value.trim();
+    const confirmPassword = registerConfirmPassword.value.trim();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showRegisterError('Correo electrónico inválido.');
+        return;
+    }
+    if (password.length < 6) {
+        showRegisterError('La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
+    if (password !== confirmPassword) {
+        showRegisterError('Las contraseñas no coinciden.');
+        return;
+    }
+    if (getRegisteredUser(email)) {
+        showRegisterError('Ya existe una cuenta con ese correo. Inicia sesión.');
+        return;
+    }
+
+    const userName = email.split('@')[0].replace(/\./g, ' ') || 'Usuario';
+    AppState.userLoggedIn = true;
+    AppState.user.name = userName;
+    AppState.user.email = email;
+    AppState.user.password = password;
+    AppState.user.purchases = [];
+    AppState.user.sales = [];
+    const newUser = {
+        name: userName,
+        email,
+        password,
+        purchases: [],
+        sales: []
+    };
+    AppState.registeredUsers.push(newUser);
+    persistCurrentUserAccount();
+    loginBtn.classList.add('hidden');
+    userProfile.querySelector('.profile-name').textContent = userName;
+    userProfile.classList.add('active');
+    renderUserProfile();
+    closeModal(loginModal);
+    showNotification('Cuenta creada y sesión iniciada.', 'success');
+    registerForm.reset();
+    showLoginForm();
+});
 
 buyBtn.addEventListener('click', () => {
     if (!AppState.userLoggedIn) {
@@ -367,47 +578,37 @@ userProfile.addEventListener('click', () => {
 closeProfileBtn.addEventListener('click', () => closeModal(profileModal));
 profileModal.addEventListener('click', (e) => { if (e.target === profileModal) closeModal(profileModal); });
 
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = loginForm.querySelector('button[type="submit"]');
-    const btnText = btn.querySelector('.btn-text');
-    const spinner = btn.querySelector('.spinner');
-    const defaultText = btnText.textContent;
-
-    const email = loginEmail.value.trim();
-    const password = loginPassword.value.trim();
-
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        showNotification('Inicio de sesión fallido: correo inválido.', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showNotification('Inicio de sesión fallido: la contraseña debe tener al menos 6 caracteres.', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btnText.textContent = 'Verificando...';
-    spinner.classList.remove('hidden');
-
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const userName = email.split('@')[0].replace(/\./g, ' ') || 'Usuario';
-    AppState.userLoggedIn = true;
-    AppState.user.name = userName;
-    AppState.user.email = email;
-    loginBtn.classList.add('hidden');
-    userProfile.querySelector('.profile-name').textContent = userName;
-    userProfile.classList.add('active');
-    closeModal(loginModal);
-    renderUserProfile();
-    showNotification('Inicio de sesión exitoso.', 'success');
-    loginForm.reset();
-
-    btn.disabled = false;
-    btnText.textContent = defaultText;
-    spinner.classList.add('hidden');
+// Reemplaza el bloque interior del loginForm submit cuando pasa las validaciones de formato:
+try {
+    // Hacemos una petición POST enviando las credenciales al backend
+   const response = await fetch(`${API_URL}?action=login`, {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+        email: email,
+        password: password
+    })
 });
+    
+    const result = await response.json();
+
+    if (result.success) {
+        showNotification('¡Bienvenido de vuelta a MyMarket!', 'success');
+        AppState.userLoggedIn = true;
+        AppState.user.name = result.user.nombre;
+        AppState.user.email = result.user.email;
+        
+        loginModal.classList.remove('active');
+        loginForm.reset();
+        renderUserProfile(); // Actualiza la UI de tu navbar con los datos reales
+    } else {
+        showNotification(result.message, 'error'); // "Credenciales incorrectas" desde la BD
+    }
+} catch (error) {
+    showNotification('Error al procesar la solicitud de ingreso.', 'error');
+}
 
 sellCloseBtn.addEventListener('click', () => closeModal(sellModal));
 sellModal.addEventListener('click', (e) => { if (e.target === sellModal) closeModal(sellModal); });
@@ -433,10 +634,17 @@ sellForm.addEventListener('submit', async (e) => {
     const condition = document.getElementById('sell-condition').value;
     const description = document.getElementById('sell-description').value.trim();
     const location = document.getElementById('sell-location').value.trim();
+    const phone = document.getElementById('sell-phone').value.trim();
     const delivery = document.getElementById('sell-delivery').value;
+    const imageFiles = document.getElementById('sell-images').files;
 
-    if (!title || !category || !price || !quantity || !condition || !description || !location || !delivery) {
+    if (!title || !category || !price || !quantity || !condition || !description || !location || !phone || !delivery) {
         showNotification('Por favor completa todos los campos del formulario de venta.', 'error');
+        return;
+    }
+
+    if (!/^[0-9+\s()-]{7,20}$/.test(phone)) {
+        showNotification('Por favor ingresa un teléfono de contacto válido.', 'error');
         return;
     }
 
@@ -446,16 +654,26 @@ sellForm.addEventListener('submit', async (e) => {
 
     await new Promise(resolve => setTimeout(resolve, 1200));
 
+    let productImage = `https://images.unsplash.com/photo-1606813900440-1144e9f6b78a?w=300`;
+    if (imageFiles.length > 0) {
+        try {
+            productImage = await readImageFileAsDataURL(imageFiles[0]);
+        } catch (error) {
+            showNotification('No se pudo cargar la imagen, se usará una imagen por defecto.', 'warning');
+        }
+    }
+
     const newId = Math.max(0, ...AppState.products.map(p => p.id)) + 1;
     const newProduct = {
         id: newId,
         title,
         price: Number(price),
         stock: Number(quantity),
-        img: `https://images.unsplash.com/photo-1606813900440-1144e9f6b78a?w=300`,
+        img: productImage,
         category,
         condition,
         description,
+        phone,
         rating: 0,
         votes: 0
     };
@@ -469,6 +687,7 @@ sellForm.addEventListener('submit', async (e) => {
         quantity: Number(quantity),
         condition,
         location,
+        phone,
         delivery,
         date: new Date().toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
     };
@@ -501,6 +720,7 @@ DOM.checkoutBtn.addEventListener('click', () => {
         showNotification("El carrito está vacío", "error");
         return;
     }
+    clearPaymentError();
     const totalValue = AppState.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     document.getElementById('modal-total').textContent = formatCurrency(totalValue);
     openModal(paymentModal);
@@ -509,6 +729,9 @@ DOM.checkoutBtn.addEventListener('click', () => {
 // Cerrar modal
 closeBtnModal.addEventListener('click', () => closeModal(paymentModal));
 paymentModal.addEventListener('click', (e) => { if (e.target === paymentModal) closeModal(paymentModal); });
+
+closeProductDetailBtn.addEventListener('click', () => closeModal(productDetailModal));
+productDetailModal.addEventListener('click', (e) => { if (e.target === productDetailModal) closeModal(productDetailModal); });
 
 // Formateo automático de tarjeta (Ej: 0000 0000 0000 0000)
 cardNumberInput.addEventListener('input', (e) => {
@@ -523,6 +746,29 @@ cardExpiryInput.addEventListener('input', (e) => {
     if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2);
     e.target.value = value;
 });
+
+function showPaymentError(message) {
+    paymentError.textContent = message;
+    paymentError.classList.remove('hidden');
+}
+
+function clearPaymentError() {
+    paymentError.textContent = '';
+    paymentError.classList.add('hidden');
+}
+
+function showLoginError(message) {
+    loginError.textContent = message;
+    loginError.classList.remove('hidden');
+}
+
+function clearLoginError() {
+    loginError.textContent = '';
+    loginError.classList.add('hidden');
+}
+
+loginEmail.addEventListener('input', clearLoginError);
+loginPassword.addEventListener('input', clearLoginError);
 
 function validatePaymentDetails() {
     const name = document.getElementById('card-name').value.trim();
@@ -555,8 +801,10 @@ paymentForm.addEventListener('submit', async (e) => {
     const spinner = btn.querySelector('.spinner');
     const defaultText = btnText.textContent;
 
+    clearPaymentError();
     const validation = validatePaymentDetails();
     if (!validation.valid) {
+        showPaymentError(validation.message);
         showNotification(`Compra fallida: ${validation.message}`, 'error');
         return;
     }

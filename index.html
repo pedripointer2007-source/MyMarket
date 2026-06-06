@@ -71,7 +71,7 @@
         <div class="cart-sidebar-footer">
             <div class="summary-row">
                 <span>Total estimado:</span>
-                <span class="total-price">$<span id="cart-total-val">0.00</span></span>
+                <span class="total-price"><span id="cart-total-val">0.00</span></span>
             </div>
             <button class="checkout-btn" id="checkout-btn">Proceder al pago</button>
         </div>
@@ -84,7 +84,8 @@
             <h3>Finalizar Compra</h3>
             <button id="close-payment" class="close-modal">&times;</button>
         </div>
-        <form id="payment-form" class="payment-form">
+        <form id="payment-form" class="payment-form" novalidate>
+            <div id="payment-error" class="payment-error hidden"></div>
             <div class="form-group">
                 <label>Nombre en la tarjeta</label>
                 <input type="text" id="card-name" placeholder="JUAN PEREZ" required>
@@ -124,7 +125,8 @@
             <h3>Iniciar sesión</h3>
             <button id="close-login" class="close-modal">&times;</button>
         </div>
-        <form id="login-form" class="payment-form">
+        <form id="login-form" class="payment-form" novalidate>
+            <div id="login-error" class="form-error hidden"></div>
             <div class="form-group">
                 <label>Correo electrónico</label>
                 <input type="email" id="login-email" placeholder="usuario@correo.com" required>
@@ -133,11 +135,64 @@
                 <label>Contraseña</label>
                 <input type="password" id="login-password" placeholder="********" minlength="6" required>
             </div>
-            <button type="submit" class="pay-btn login-submit-btn">
-                <span class="btn-text">Entrar</span>
-                <div class="spinner hidden"></div>
-            </button>
+            <div class="form-actions">
+                <button type="button" id="show-register-btn" class="secondary-btn">Crear cuenta</button>
+                <button type="submit" class="pay-btn login-submit-btn">
+                    <span class="btn-text">Entrar</span>
+                    <div class="spinner hidden"></div>
+                </button>
+            </div>
         </form>
+        <form id="register-form" class="payment-form hidden" novalidate>
+            <div id="register-error" class="form-error hidden"></div>
+            <div class="form-group">
+                <label>Correo electrónico</label>
+                <input type="email" id="register-email" placeholder="usuario@correo.com" required>
+            </div>
+            <div class="form-group">
+                <label>Contraseña</label>
+                <input type="password" id="register-password" placeholder="********" minlength="6" required>
+            </div>
+            <div class="form-group">
+                <label>Confirmar contraseña</label>
+                <input type="password" id="register-confirm-password" placeholder="********" minlength="6" required>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="show-login-btn" class="secondary-btn">Volver</button>
+                <button type="submit" class="pay-btn register-submit-btn">
+                    <span class="btn-text">Crear cuenta</span>
+                    <div class="spinner hidden"></div>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="product-detail-modal" class="modal">
+    <div class="modal-content product-detail-content">
+        <div class="modal-header">
+            <h3>Detalles del producto</h3>
+            <button id="close-product-detail" class="close-modal">&times;</button>
+        </div>
+        <div class="product-detail-body">
+            <div class="detail-preview">
+                <img id="detail-product-image" src="" alt="Producto">
+            </div>
+            <div class="detail-info">
+                <h4 id="detail-product-title"></h4>
+                <p id="detail-product-description"></p>
+                <div class="detail-grid">
+                    <div><strong>Precio:</strong> <span id="detail-product-price"></span></div>
+                    <div><strong>Disponibles:</strong> <span id="detail-product-stock"></span></div>
+                    <div><strong>Categoría:</strong> <span id="detail-product-category"></span></div>
+                    <div><strong>Condición:</strong> <span id="detail-product-condition"></span></div>
+                </div>
+                <div id="detail-seller-contact" class="detail-contact hidden">
+                    <button id="detail-contact-whatsapp" class="contact-btn inactive" type="button">Contactar por WhatsApp</button>
+                </div>
+                <div id="detail-contact-error" class="form-error hidden"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -201,6 +256,10 @@
                         <option value="Entrega personal">Entrega personal</option>
                     </select>
                 </div>
+            </div>
+            <div class="form-group">
+                <label>Teléfono de contacto</label>
+                <input type="tel" id="sell-phone" placeholder="+506 1234 5678" pattern="[0-9+\s()-]{7,20}" required>
             </div>
             <div class="form-group">
                 <label>Fotos del producto</label>
