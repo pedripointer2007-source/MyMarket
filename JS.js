@@ -3,11 +3,11 @@
 // ==========================================
 const API_URL = 'http://mymarket-api.gamer.gd/api.php';
 
-
 // 1. Estado Centralizado de la Aplicación
 const AppState = {
     products: [],
     filteredProducts: [],
+    savedProducts: JSON.parse(localStorage.getItem('mymarket_products')) || [],
     cart: JSON.parse(localStorage.getItem('mymarket_cart')) || [],
     loading: true,
     userLoggedIn: false,
@@ -50,19 +50,39 @@ async function loadCatalogData() {
         // Convertimos la respuesta de la base de datos a JSON
         const data = await response.json();
 
-        // Guardamos los productos reales de la base de datos en tu AppState
-        AppState.products = data;
-        AppState.filteredProducts = [...AppState.products];
+        const fetchedProducts = Array.isArray(data) ? data : [];
         AppState.loading = false;
-        
-        // Renderizamos tu catálogo original con los datos de internet
-        renderCatalog();
+
+        if (fetchedProducts.length > 0) {
+            AppState.products = [...fetchedProducts];
+            AppState.filteredProducts = [...fetchedProducts];
+            AppState.savedProducts = [...fetchedProducts];
+            saveProducts();
+            renderCatalog();
+        } else if (AppState.savedProducts.length > 0) {
+            AppState.products = [...AppState.savedProducts];
+            AppState.filteredProducts = [...AppState.savedProducts];
+            renderCatalog();
+            showNotification("Mostrando productos publicados anteriormente.", "success");
+        } else {
+            AppState.products = [];
+            AppState.filteredProducts = [];
+            renderCatalog();
+        }
 
     } catch (error) {
         console.error("Error al conectar con la base de datos:", error);
         AppState.loading = false;
-        DOM.productsContainer.innerHTML = `<p class="error-msg">Ocurrió un error al cargar el catálogo desde la base de datos. Por favor reintenta.</p>`;
-        showNotification("Error de conexión con el servidor", "error");
+
+        if (AppState.savedProducts.length > 0) {
+            AppState.products = [...AppState.savedProducts];
+            AppState.filteredProducts = [...AppState.savedProducts];
+            renderCatalog();
+            showNotification("Mostrando productos publicados anteriormente.", "success");
+        } else {
+            DOM.productsContainer.innerHTML = `<p class="error-msg">Ocurrió un error al cargar el catálogo desde el servidor. Por favor reintenta.</p>`;
+            showNotification("Error de conexión con el servidor", "error");
+        }
     }
 }
 
@@ -232,6 +252,10 @@ function saveRegisteredUsers() {
     localStorage.setItem('mymarket_users', JSON.stringify(AppState.registeredUsers));
 }
 
+function saveProducts() {
+    localStorage.setItem('mymarket_products', JSON.stringify(AppState.savedProducts));
+}
+
 function getRegisteredUser(email) {
     return AppState.registeredUsers.find(user => user.email.toLowerCase() === email.toLowerCase());
 }
@@ -253,6 +277,34 @@ function persistCurrentUserAccount() {
         AppState.registeredUsers.push(userCopy);
     }
     saveRegisteredUsers();
+}
+
+function loginLocalUser(user) {
+    AppState.userLoggedIn = true;
+    AppState.user.name = user.name || user.email.split('@')[0];
+    AppState.user.email = user.email;
+    AppState.user.password = user.password;
+    AppState.user.purchases = user.purchases || [];
+    AppState.user.sales = user.sales || [];
+    if (!getRegisteredUser(user.email)) {
+        AppState.registeredUsers.push(user);
+        saveRegisteredUsers();
+    }
+
+    loginBtn.classList.add('hidden');
+    userProfile.querySelector('.profile-name').textContent = AppState.user.name;
+    userProfile.classList.add('active');
+    renderUserProfile();
+    closeModal(loginModal);
+}
+
+function tryLocalLogin(email, password) {
+    const storedUser = getRegisteredUser(email);
+    if (!storedUser) return false;
+    if (storedUser.password !== password) return false;
+
+    loginLocalUser(storedUser);
+    return true;
 }
 
 function formatCurrency(amount) {
@@ -594,6 +646,12 @@ loginForm.addEventListener('submit', async (e) => {
         return;
     }
 
+    if (tryLocalLogin(email, password)) {
+        showNotification('¡Bienvenido de vuelta a MyMarket!', 'success');
+        loginForm.reset();
+        return;
+    }
+
     try {
         const response = await fetch(`${API_URL}?action=login`, {
             method: 'POST',
@@ -611,22 +669,23 @@ loginForm.addEventListener('submit', async (e) => {
 
         if (result.success) {
             showNotification('¡Bienvenido de vuelta a MyMarket!', 'success');
-            AppState.userLoggedIn = true;
-            AppState.user.name = result.user.nombre || result.user.name || email.split('@')[0];
-            AppState.user.email = result.user.email;
-            AppState.user.password = password;
-            AppState.user.purchases = result.user.purchases || AppState.user.purchases;
-            AppState.user.sales = result.user.sales || AppState.user.sales;
-
-            loginModal.classList.remove('active');
+            loginLocalUser({
+                name: result.user.nombre || result.user.name || email.split('@')[0],
+                email: result.user.email,
+                password,
+                purchases: result.user.purchases || [],
+                sales: result.user.sales || []
+            });
             loginForm.reset();
-            userProfile.querySelector('.profile-name').textContent = AppState.user.name;
-            userProfile.classList.add('active');
-            renderUserProfile();
         } else {
             showLoginError(result.message || 'Credenciales incorrectas.');
         }
     } catch (error) {
+        if (tryLocalLogin(email, password)) {
+            showNotification('¡Bienvenido de vuelta a MyMarket! Login local exitoso.', 'success');
+            loginForm.reset();
+            return;
+        }
         showLoginError('Error al procesar la solicitud de ingreso.');
         console.error(error);
     }
@@ -701,6 +760,8 @@ sellForm.addEventListener('submit', async (e) => {
     };
 
     AppState.products.unshift(newProduct);
+    AppState.savedProducts.unshift(newProduct);
+    saveProducts();
 
     const saleRecord = {
         id: newId,
