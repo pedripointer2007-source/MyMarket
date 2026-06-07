@@ -301,6 +301,23 @@ function persistCurrentUserAccount() {
     saveRegisteredUsers();
 }
 
+function logoutUser() {
+    AppState.userLoggedIn = false;
+    AppState.user = {
+        name: '',
+        email: '',
+        password: '',
+        purchases: [],
+        sales: []
+    };
+    loginBtn.classList.remove('hidden');
+    userProfile.classList.remove('active');
+    userProfile.querySelector('.profile-name').textContent = 'Usuario';
+    renderUserProfile();
+    closeModal(profileModal);
+    showNotification('Has cerrado sesión.', 'success');
+}
+
 function loginLocalUser(user) {
     AppState.userLoggedIn = true;
     AppState.user.name = user.name || user.email.split('@')[0];
@@ -480,6 +497,7 @@ const salesHistoryContainer = document.getElementById('sales-history');
 const sellModal = document.getElementById('sell-modal');
 const sellForm = document.getElementById('sell-form');
 const sellCloseBtn = document.getElementById('close-sell');
+const logoutBtn = document.getElementById('logout-btn');
 
 const openModal = (modal) => {
     modal.classList.add('active');
@@ -651,6 +669,7 @@ userProfile.addEventListener('click', () => {
 
 closeProfileBtn.addEventListener('click', () => closeModal(profileModal));
 profileModal.addEventListener('click', (e) => { if (e.target === profileModal) closeModal(profileModal); });
+logoutBtn.addEventListener('click', logoutUser);
 
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
