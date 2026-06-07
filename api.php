@@ -25,7 +25,7 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
 switch($action) {
     case 'get_products':
         // Obtener productos reales de phpMyAdmin
-        $query = "SELECT * FROM productos";
+        $query = "SELECT * FROM productos ORDER BY id DESC";
         $stmt = $conn->prepare($query);
         $stmt->execute();
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -75,6 +75,35 @@ switch($action) {
             echo json_encode(["success" => true, "user" => $user]);
         } else {
             echo json_encode(["success" => false, "message" => "Credenciales incorrectas."]);
+        }
+        break;
+
+    case 'publish_product':
+        $data = json_decode(file_get_contents("php://input"));
+        if (empty($data->title) || empty($data->price) || empty($data->stock) || empty($data->category) || empty($data->condition) || empty($data->description)) {
+            echo json_encode(["success" => false, "message" => "Todos los campos del producto son requeridos."]);
+            break;
+        }
+        $query = "INSERT INTO productos (title, description, price, stock, img, category, `condition`, phone, delivery, location, seller) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($query);
+        $params = [
+            $data->title,
+            $data->description,
+            $data->price,
+            $data->stock,
+            $data->img,
+            $data->category,
+            $data->condition,
+            $data->phone ?? '',
+            $data->delivery ?? '',
+            $data->location ?? '',
+            $data->seller ?? ''
+        ];
+        if ($stmt->execute($params)) {
+            $insertId = $conn->lastInsertId();
+            echo json_encode(["success" => true, "message" => "Producto publicado.", "product" => ["id" => $insertId]]);
+        } else {
+            echo json_encode(["success" => false, "message" => "No se pudo publicar el producto."]);
         }
         break;
 

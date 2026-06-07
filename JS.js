@@ -256,6 +256,28 @@ function saveProducts() {
     localStorage.setItem('mymarket_products', JSON.stringify(AppState.savedProducts));
 }
 
+async function publishProductToServer(productData) {
+    try {
+        const response = await fetch(`${API_URL}?action=publish_product`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(productData)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error en la red: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Error publicando producto en el servidor:', error);
+        return { success: false, error };
+    }
+}
+
 function getRegisteredUser(email) {
     return AppState.registeredUsers.find(user => user.email.toLowerCase() === email.toLowerCase());
 }
@@ -744,27 +766,61 @@ sellForm.addEventListener('submit', async (e) => {
         }
     }
 
-    const newId = Math.max(0, ...AppState.products.map(p => p.id)) + 1;
-    const newProduct = {
-        id: newId,
+    const productPayload = {
         title,
+        description,
         price: Number(price),
         stock: Number(quantity),
         img: productImage,
         category,
         condition,
-        description,
         phone,
-        rating: 0,
-        votes: 0
+        delivery,
+        location,
+        seller: AppState.user.email || 'anonimo'
     };
 
-    AppState.products.unshift(newProduct);
-    AppState.savedProducts.unshift(newProduct);
+    const result = await publishProductToServer(productPayload);
+    let publishedProduct = null;
+
+    if (result.success && result.product) {
+        publishedProduct = {
+            id: Number(result.product.id),
+            title,
+            price: Number(price),
+            stock: Number(quantity),
+            img: productImage,
+            category,
+            condition,
+            description,
+            phone,
+            rating: 0,
+            votes: 0
+        };
+    } else {
+        showNotification('No se pudo guardar el producto en el servidor. Se guarda localmente para mostrarlo temporalmente.', 'warning');
+        const newId = Math.max(0, ...AppState.products.map(p => p.id)) + 1;
+        publishedProduct = {
+            id: newId,
+            title,
+            price: Number(price),
+            stock: Number(quantity),
+            img: productImage,
+            category,
+            condition,
+            description,
+            phone,
+            rating: 0,
+            votes: 0
+        };
+    }
+
+    AppState.products.unshift(publishedProduct);
+    AppState.savedProducts.unshift(publishedProduct);
     saveProducts();
 
     const saleRecord = {
-        id: newId,
+        id: publishedProduct.id,
         title,
         price: Number(price),
         quantity: Number(quantity),
@@ -778,7 +834,7 @@ sellForm.addEventListener('submit', async (e) => {
 
     const currentSearch = DOM.searchInput.value.trim().toLowerCase();
     if (!currentSearch || title.toLowerCase().includes(currentSearch)) {
-        AppState.filteredProducts.unshift(newProduct);
+        AppState.filteredProducts.unshift(publishedProduct);
     }
 
     showNotification('Producto publicado correctamente en Marketplace.', 'success');
