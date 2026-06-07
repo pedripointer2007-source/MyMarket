@@ -305,7 +305,15 @@
                 </select>
             </div>
             <div class="profile-logout">
+                <p class="logout-label">Cerrar sesión de tu cuenta actual</p>
                 <button type="button" id="logout-btn" class="secondary-btn">Cerrar sesión</button>
+                <div id="logout-confirm" class="logout-confirm hidden">
+                    <p>¿Estás seguro de cerrar sesión?</p>
+                    <div class="logout-actions">
+                        <button type="button" id="confirm-logout-btn" class="secondary-btn">Sí, cerrar sesión</button>
+                        <button type="button" id="cancel-logout-btn" class="btn-secondary">Cancelar</button>
+                    </div>
+                </div>
             </div>
         </div>
         <section class="history-section">

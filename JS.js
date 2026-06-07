@@ -498,6 +498,9 @@ const sellModal = document.getElementById('sell-modal');
 const sellForm = document.getElementById('sell-form');
 const sellCloseBtn = document.getElementById('close-sell');
 const logoutBtn = document.getElementById('logout-btn');
+const logoutConfirm = document.getElementById('logout-confirm');
+const confirmLogoutBtn = document.getElementById('confirm-logout-btn');
+const cancelLogoutBtn = document.getElementById('cancel-logout-btn');
 
 const openModal = (modal) => {
     modal.classList.add('active');
@@ -548,12 +551,15 @@ function openProductDetails(productId) {
     detailProductCondition.textContent = product.condition || 'No especificado';
 
     const userHasPurchasedProduct = AppState.user.purchases.some(item => item.id === productId);
+    const userHasAddedProductToCart = AppState.cart.some(item => item.id === productId);
+    const canContactSeller = userHasPurchasedProduct || userHasAddedProductToCart;
+
     if (product.phone) {
         const cleanPhone = product.phone.replace(/\D/g, '');
         detailContactWhatsapp.dataset.phone = cleanPhone;
-        detailContactWhatsapp.dataset.active = userHasPurchasedProduct ? 'true' : 'false';
-        detailContactWhatsapp.classList.toggle('inactive', !userHasPurchasedProduct);
-        detailContactWhatsapp.setAttribute('aria-label', userHasPurchasedProduct ? 'Contactar por WhatsApp' : 'Contactar por WhatsApp (deshabilitado)');
+        detailContactWhatsapp.dataset.active = canContactSeller ? 'true' : 'false';
+        detailContactWhatsapp.classList.toggle('inactive', !canContactSeller);
+        detailContactWhatsapp.setAttribute('aria-label', canContactSeller ? 'Contactar por WhatsApp' : 'Contactar por WhatsApp (deshabilitado)');
         detailSellerContact.classList.remove('hidden');
     } else {
         detailSellerContact.classList.add('hidden');
@@ -567,11 +573,14 @@ detailContactWhatsapp.addEventListener('click', () => {
     const isActive = detailContactWhatsapp.dataset.active === 'true';
     if (!phone) return;
     if (!isActive) {
-        showDetailContactError('Solo puedes contactar al vendedor si compras algunos de sus productos.');
+        showDetailContactError('Solo puedes contactar al vendedor si agregas el producto al carrito o ya lo compraste.');
         return;
     }
     clearDetailContactError();
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent('Me gustaria mas informacion')}`, '_blank');
+    const product = AppState.products.find(item => item.phone && item.phone.replace(/\D/g, '') === phone);
+    const productName = product ? product.title : 'Estoy interesado';
+    const message = `Hola, estoy interesado en el producto: ${productName}. ¿Podría obtener más información?`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 });
 
 function showDetailContactError(message) {
@@ -669,7 +678,21 @@ userProfile.addEventListener('click', () => {
 
 closeProfileBtn.addEventListener('click', () => closeModal(profileModal));
 profileModal.addEventListener('click', (e) => { if (e.target === profileModal) closeModal(profileModal); });
-logoutBtn.addEventListener('click', logoutUser);
+logoutBtn.addEventListener('click', () => {
+    if (!logoutConfirm) return;
+    logoutConfirm.classList.remove('hidden');
+    logoutBtn.classList.add('hidden');
+});
+confirmLogoutBtn.addEventListener('click', () => {
+    logoutUser();
+    if (!logoutConfirm) return;
+    logoutConfirm.classList.add('hidden');
+});
+cancelLogoutBtn.addEventListener('click', () => {
+    if (!logoutConfirm) return;
+    logoutConfirm.classList.add('hidden');
+    logoutBtn.classList.remove('hidden');
+});
 
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();

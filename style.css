@@ -209,6 +209,36 @@ body {
     font-size: 0.95rem;
 }
 
+.profile-logout {
+    margin-top: 20px;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.08);
+    display: grid;
+    gap: 12px;
+}
+
+.logout-label {
+    margin: 0;
+    color: #cbd5e1;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.profile-logout .secondary-btn {
+    width: 100%;
+    justify-content: center;
+    background: #ffffff;
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.18);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.profile-logout .secondary-btn:hover {
+    background: #f8fafc;
+}
+
 .stat-label {
     display: block;
     color: var(--text-muted);
@@ -873,6 +903,31 @@ body {
     justify-content: center;
     flex-wrap: wrap;
     margin-top: 10px;
+}
+
+.logout-confirm {
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-top: 14px;
+}
+
+.logout-confirm p {
+    margin: 0 0 10px;
+    color: #1e3a8a;
+    font-weight: 600;
+}
+
+.logout-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.logout-actions .secondary-btn,
+.logout-actions .btn-secondary {
+    min-width: 140px;
 }
 
 .form-actions .pay-btn,
