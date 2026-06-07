@@ -36,6 +36,11 @@ const DOM = {
     checkoutBtn: document.getElementById('checkout-btn')
 };
 
+const cartTooltipOverlay = document.createElement('div');
+cartTooltipOverlay.className = 'cart-item-tooltip-overlay hidden';
+document.body.appendChild(cartTooltipOverlay);
+let cartTooltipHideTimer = null;
+
 // 3. Petición API Real conectada a phpMyAdmin con Control de Errores
 async function loadCatalogData() {
     renderSkeletons();
@@ -104,14 +109,16 @@ function renderCatalog() {
         return;
     }
 
+    const showHoverPreview = AppState.cart.length > 0;
     DOM.productsContainer.innerHTML = AppState.filteredProducts.map(product => {
         // Calcular stock real restando lo que ya está en el carrito temporal
         const cartItem = AppState.cart.find(item => item.id === product.id);
         const dynamicStock = cartItem ? product.stock - cartItem.quantity : product.stock;
         const isOut = dynamicStock <= 0;
+        const shortDescription = product.description ? product.description.slice(0, 100) : 'Descripción no disponible.';
 
         return `
-            <article class="product-card">
+            <article class="product-card${showHoverPreview ? ' tooltip-enabled' : ''}">
                 <div class="product-image-wrapper">
                     <img src="${product.img}" alt="${product.title}" loading="lazy">
                 </div>
@@ -122,6 +129,12 @@ function renderCatalog() {
                         <p class="product-stock">${isOut ? '<span style="color:red; font-weight:600;">Agotado</span>' : `Disponibles: ${dynamicStock}`}</p>
                         ${renderRatingStars(product)}
                     </div>
+                </div>
+                <div class="product-tooltip">
+                    <strong>${product.title}</strong>
+                    <p>${shortDescription}${product.description && product.description.length > 100 ? '...' : ''}</p>
+                    <p><strong>Precio:</strong> ${formatCurrency(product.price)}</p>
+                    <p><strong>Disponibles:</strong> ${isOut ? 'Agotado' : dynamicStock}</p>
                 </div>
                 <div class="product-actions">
                     <button class="btn-secondary" onclick="openProductDetails(${product.id})">Ver detalles</button>
@@ -150,13 +163,27 @@ function renderCart() {
     AppState.cart.forEach(item => {
         totalCount += item.quantity;
         totalPrice += item.price * item.quantity;
+        const shortDescription = item.description ? item.description.slice(0, 100) : 'Sin descripción disponible.';
+        const category = item.category || 'No especificada';
+        const condition = item.condition || 'No especificada';
 
         const div = document.createElement('div');
         div.classList.add('cart-item');
+        const canContact = item.phone && item.phone.trim().length > 0;
         div.innerHTML = `
             <div class="cart-item-details">
                 <h4 class="cart-item-title">${item.title}</h4>
                 <p class="cart-item-price">${formatCurrency(item.price)} x ${item.quantity}</p>
+                <div class="cart-item-tooltip-content hidden">
+                    <img src="${item.img}" alt="${item.title}" class="cart-tooltip-image">
+                    <strong>Detalles rápidos</strong>
+                    <p>${shortDescription}${item.description && item.description.length > 100 ? '...' : ''}</p>
+                    <p><strong>Categoría:</strong> ${category}</p>
+                    <p><strong>Condición:</strong> ${condition}</p>
+                    <button class="contact-cart-btn" ${canContact ? '' : 'disabled'} onclick="openCartContact(${item.id})">
+                        ${canContact ? 'Contactar por WhatsApp' : 'Sin contacto disponible'}
+                    </button>
+                </div>
             </div>
             <button class="remove-item-btn" onclick="handleRemoveFromCart(${item.id})" aria-label="Eliminar item">
                 <i class="fa-solid fa-trash-can"></i>
@@ -168,6 +195,52 @@ function renderCart() {
     DOM.cartCount.textContent = totalCount;
     DOM.cartTotal.textContent = formatCurrency(totalPrice);
 }
+
+function showCartTooltip(content, rect) {
+    clearTimeout(cartTooltipHideTimer);
+    cartTooltipOverlay.innerHTML = content;
+    cartTooltipOverlay.style.width = '320px';
+    cartTooltipOverlay.style.position = 'fixed';
+    cartTooltipOverlay.style.top = `${Math.max(16, rect.top)}px`;
+    cartTooltipOverlay.style.display = 'flex';
+    cartTooltipOverlay.style.left = '0px';
+    const tooltipWidth = cartTooltipOverlay.offsetWidth || 320;
+    const leftPos = Math.max(16, rect.left - tooltipWidth - 12);
+    cartTooltipOverlay.style.left = `${leftPos}px`;
+    cartTooltipOverlay.classList.remove('hidden');
+}
+
+function hideCartTooltip() {
+    clearTimeout(cartTooltipHideTimer);
+    cartTooltipOverlay.style.display = 'none';
+    cartTooltipOverlay.classList.add('hidden');
+    cartTooltipOverlay.innerHTML = '';
+}
+
+function scheduleHideCartTooltip() {
+    cartTooltipHideTimer = setTimeout(hideCartTooltip, 120);
+}
+
+function handleCartItemMouseOver(event) {
+    const item = event.target.closest('.cart-item');
+    if (!item || !DOM.cartItemsContainer.contains(item)) return;
+    const tooltipContent = item.querySelector('.cart-item-tooltip-content');
+    if (!tooltipContent) return;
+
+    const rect = item.getBoundingClientRect();
+    showCartTooltip(tooltipContent.innerHTML, rect);
+}
+
+function handleCartItemMouseOut(event) {
+    const item = event.target.closest('.cart-item');
+    if (!item) return;
+    cartTooltipHideTimer = setTimeout(hideCartTooltip, 120);
+}
+
+DOM.cartItemsContainer.addEventListener('mouseover', handleCartItemMouseOver);
+DOM.cartItemsContainer.addEventListener('mouseout', handleCartItemMouseOut);
+cartTooltipOverlay.addEventListener('mouseenter', () => clearTimeout(cartTooltipHideTimer));
+cartTooltipOverlay.addEventListener('mouseleave', scheduleHideCartTooltip);
 
 // 5. Controladores de Eventos y Acciones (Lógica de negocio)
 function handleAddToCart(id) {
@@ -582,6 +655,14 @@ detailContactWhatsapp.addEventListener('click', () => {
     const message = `Hola, estoy interesado en el producto: ${productName}. ¿Podría obtener más información?`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
 });
+
+function openCartContact(itemId) {
+    const item = AppState.cart.find(product => product.id === itemId);
+    if (!item || !item.phone) return;
+    const cleanPhone = item.phone.replace(/\D/g, '');
+    const message = `Hola, estoy interesado en el producto: ${item.title}. ¿Podría obtener más información?`;
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+}
 
 function showDetailContactError(message) {
     detailContactError.textContent = message;
