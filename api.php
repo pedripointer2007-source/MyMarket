@@ -13,7 +13,7 @@ $password = "453038453038";
 
 try {
     $conn = new PDO("mysql:host=" . $host . ";dbname=" . $db_name . ";charset=utf8", $username, $password);
-    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ATTR_ERRMODE_EXCEPTION);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $exception) {
     echo json_encode(["error" => "Error de conexión: " . $exception->getMessage()]);
     exit();
@@ -35,29 +35,35 @@ switch($action) {
     case 'register':
         // Registrar un nuevo usuario
         $data = json_decode(file_get_contents("php://input"));
-        if(!empty($data->nombre) && !empty($data->email) && !empty($data->password)) {
-            // Validar si el email ya existe
-            $check = $conn->prepare("SELECT id FROM usuarios WHERE email = ?");
-            $check->execute([$data->email]);
-            if($check->rowCount() > 0) {
-                echo json_encode(["success" => false, "message" => "El correo ya está registrado."]);
-                break;
-            }
-            // Encriptar contraseña por seguridad antes de guardarla
-            $pass_hash = password_hash($data->password, PASSWORD_BCRYPT);
-            $query = "INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)";
-            $stmt = $conn->prepare($query);
-            if($stmt->execute([$data->nombre, $data->email, $pass_hash])) {
-                echo json_encode(["success" => true, "message" => "Usuario registrado."]);
-            } else {
-                echo json_encode(["success" => false, "message" => "No se pudo registrar."]);
-            }
+        if (empty($data->nombre) || empty($data->email) || empty($data->password)) {
+            echo json_encode(["success" => false, "message" => "Por favor completa todos los campos de registro."]);
+            break;
+        }
+        // Validar si el email ya existe
+        $check = $conn->prepare("SELECT id FROM usuarios WHERE email = ?");
+        $check->execute([$data->email]);
+        if($check->rowCount() > 0) {
+            echo json_encode(["success" => false, "message" => "El correo ya está registrado."]);
+            break;
+        }
+        // Encriptar contraseña por seguridad antes de guardarla
+        $pass_hash = password_hash($data->password, PASSWORD_BCRYPT);
+        $query = "INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)";
+        $stmt = $conn->prepare($query);
+        if($stmt->execute([$data->nombre, $data->email, $pass_hash])) {
+            echo json_encode(["success" => true, "message" => "Usuario registrado."]);
+        } else {
+            echo json_encode(["success" => false, "message" => "No se pudo registrar."]);
         }
         break;
 
     case 'login':
         // Iniciar sesión verificando la base de datos
         $data = json_decode(file_get_contents("php://input"));
+        if (empty($data->email) || empty($data->password)) {
+            echo json_encode(["success" => false, "message" => "Correo y contraseña son requeridos."]);
+            break;
+        }
         $query = "SELECT * FROM usuarios WHERE email = ?";
         $stmt = $conn->prepare($query);
         $stmt->execute([$data->email]);
@@ -75,13 +81,17 @@ switch($action) {
     case 'checkout':
         // Procesar la compra de forma transaccional
         $data = json_decode(file_get_contents("php://input"));
+        if (empty($data->items) || empty($data->total)) {
+            echo json_encode(["success" => false, "message" => "Datos de compra incompletos."]);
+            break;
+        }
         // Aquí recibirías el id_usuario, total y los items del carrito para insertarlos
         // en las tablas 'ordenes' y 'detalle_ordenes' usando $conn->beginTransaction()
         echo json_encode(["success" => true, "message" => "Simulación de orden procesada en BD."]);
         break;
 
     default:
-        echo json_encode(["message" => "Acción no válida."]);
+        echo json_encode(["success" => false, "message" => "Acción no válida."]);
         break;
 }
 ?>

@@ -578,37 +578,59 @@ userProfile.addEventListener('click', () => {
 closeProfileBtn.addEventListener('click', () => closeModal(profileModal));
 profileModal.addEventListener('click', (e) => { if (e.target === profileModal) closeModal(profileModal); });
 
-// Reemplaza el bloque interior del loginForm submit cuando pasa las validaciones de formato:
-try {
-    // Hacemos una petición POST enviando las credenciales al backend
-   const response = await fetch(`${API_URL}?action=login`, {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-        email: email,
-        password: password
-    })
-});
-    
-    const result = await response.json();
+loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearLoginError();
 
-    if (result.success) {
-        showNotification('¡Bienvenido de vuelta a MyMarket!', 'success');
-        AppState.userLoggedIn = true;
-        AppState.user.name = result.user.nombre;
-        AppState.user.email = result.user.email;
-        
-        loginModal.classList.remove('active');
-        loginForm.reset();
-        renderUserProfile(); // Actualiza la UI de tu navbar con los datos reales
-    } else {
-        showNotification(result.message, 'error'); // "Credenciales incorrectas" desde la BD
+    const email = loginEmail.value.trim();
+    const password = loginPassword.value.trim();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showLoginError('Correo electrónico inválido.');
+        return;
     }
-} catch (error) {
-    showNotification('Error al procesar la solicitud de ingreso.', 'error');
-}
+    if (password.length < 6) {
+        showLoginError('La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}?action=login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error en la red: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification('¡Bienvenido de vuelta a MyMarket!', 'success');
+            AppState.userLoggedIn = true;
+            AppState.user.name = result.user.nombre || result.user.name || email.split('@')[0];
+            AppState.user.email = result.user.email;
+            AppState.user.password = password;
+            AppState.user.purchases = result.user.purchases || AppState.user.purchases;
+            AppState.user.sales = result.user.sales || AppState.user.sales;
+
+            loginModal.classList.remove('active');
+            loginForm.reset();
+            userProfile.querySelector('.profile-name').textContent = AppState.user.name;
+            userProfile.classList.add('active');
+            renderUserProfile();
+        } else {
+            showLoginError(result.message || 'Credenciales incorrectas.');
+        }
+    } catch (error) {
+        showLoginError('Error al procesar la solicitud de ingreso.');
+        console.error(error);
+    }
+});
 
 sellCloseBtn.addEventListener('click', () => closeModal(sellModal));
 sellModal.addEventListener('click', (e) => { if (e.target === sellModal) closeModal(sellModal); });
